@@ -1,0 +1,1 @@
+# Akilli_Tarim_Sistemi
