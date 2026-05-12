@@ -1,0 +1,10 @@
+.vs/
+[Bb]in/
+[Oo]bj/
+*.user
+*.userosscache
+*.suo
+*.sln.docstates
+__pycache__/
+*.pyc
+.venv/
