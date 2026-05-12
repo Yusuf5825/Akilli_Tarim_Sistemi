@@ -1,0 +1,9 @@
+.venv/
+__pycache__/
+*.pyc
+.DS_Store
+runs/
+dataset/
+dataset_v2/
+bitki_resimleri/
+*.zip
