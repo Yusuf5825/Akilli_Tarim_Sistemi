@@ -1,0 +1,156 @@
+﻿@page "/ai-analiz"
+@using System.IO
+@using BahceYonetim.Models
+@inject AIAnalizServisi AnalizServisi
+@inject BahceServisi BahceHafizasi
+
+<div class="sayfa-baslik">
+    <h1>🔬 AI Analiz</h1>
+    <p>Bitkinin yaprağının fotoğrafını yükle, hastalık olup olmadığını analiz edelim.</p>
+</div>
+
+<div class="ai-alan">
+    <div class="form-baslik">Yaprak Analizi</div>
+
+    @if (!fotografYuklendi)
+    {
+        <div class="surukle-birak">
+            <InputFile id="fileInput" OnChange="FotografSecildi" accept="image/*" style="padding: 50px; cursor: pointer; width: 100%; opacity: 0.5;" />
+            <p style="margin-top: -30px;">Tıklayarak bir yaprak fotoğrafı seçin</p>
+        </div>
+    }
+
+    @if (fotografYuklendi)
+    {
+        <div class="onizleme">
+            <img src="@onizlemeSrc" style="max-width: 300px; border-radius: 8px; border: 1px solid #ddd;" />
+            <div style="margin-top: 10px; font-size: 0.9rem; color: #666;">📎 @fotografAdi</div>
+        </div>
+
+        <div style="margin-top: 20px; display: flex; gap: 10px;">
+            <button class="btn btn-primary" @onclick="AnalizEt" disabled="@analizYapiliyor">
+                @(analizYapiliyor ? "⏳ Analiz Ediliyor..." : "🔬 Analiz Et")
+            </button>
+            <button class="btn btn-danger" @onclick="Sifirla">🗑️ Temizle</button>
+        </div>
+    }
+
+    @if (sonucGoster)
+    {
+        <div class="sonuc-kutu @(sonucBasarili ? "basarili" : "")"
+             style="margin-top: 20px; padding: 15px; border-radius: 8px;
+                        background: @(sonucBasarili ? "#e8f5e9" : "#ffebee");
+                        border: 1px solid @(sonucBasarili ? "#2e7d32" : "#c62828");">
+            <div class="sonuc-baslik" style="font-weight: bold; font-size: 1.1rem; color: @(sonucBasarili ? "#2e7d32" : "#c62828");">
+                @sonucBaslik
+            </div>
+            <div class="sonuc-aciklama" style="margin-top: 5px;">@sonucAciklama</div>
+        </div>
+    }
+
+    @if (!string.IsNullOrEmpty(hataMesaji))
+    {
+        <div style="color: #c62828; margin-top: 15px; font-weight: bold; background: #fff5f5; padding: 10px; border-radius: 5px; border: 1px solid #c62828;">
+            ⚠️ @hataMesaji
+        </div>
+    }
+</div>
+
+@code {
+    private bool fotografYuklendi = false, analizYapiliyor = false, sonucGoster = false, sonucBasarili = false;
+    private string onizlemeSrc = "", fotografAdi = "";
+    private string sonucBaslik = "", sonucAciklama = "", hataMesaji = "";
+
+    // Dosyayı bellekte (RAM) güvenle tutmak için byte array
+    private byte[]? dosyaIcerigi;
+
+    private async Task FotografSecildi(InputFileChangeEventArgs e)
+    {
+        try
+        {
+            var secilenDosya = e.File;
+            fotografAdi = secilenDosya.Name;
+
+            // Dosyayı tarayıcı belleğine (MemoryStream) alıyoruz
+            using var ms = new MemoryStream();
+            await secilenDosya.OpenReadStream(5 * 1024 * 1024).CopyToAsync(ms);
+            dosyaIcerigi = ms.ToArray();
+
+            // Önizleme için Base64 formatına çeviriyoruz
+            onizlemeSrc = $"data:{secilenDosya.ContentType};base64,{Convert.ToBase64String(dosyaIcerigi)}";
+
+            fotografYuklendi = true;
+            hataMesaji = "";
+            sonucGoster = false;
+        }
+        catch (Exception ex)
+        {
+            hataMesaji = "Fotoğraf işlenirken hata oluştu: " + ex.Message;
+        }
+    }
+
+    private async Task AnalizEt()
+    {
+        if (dosyaIcerigi == null) return;
+
+        analizYapiliyor = true;
+        hataMesaji = "";
+        sonucGoster = false;
+
+        try
+        {
+            string sonuc = await AnalizServisi.ResimAnalizEt(dosyaIcerigi, fotografAdi);
+
+            if (!sonuc.StartsWith("HATA"))
+            {
+                // ÇÖZÜM BURADA: Gelen sonucun başındaki ve sonundaki tırnakları, boşlukları temizle
+                sonuc = sonuc.Trim('"', '\'', ' ', '\n', '\r');
+
+                // Örnek Gelen Sonuç: Misir___Pas (Artık tırnaksız!)
+                var parcalar = sonuc.Split("___");
+                string tespitEdilenTur = parcalar[0];
+
+                // AI'nın bulduğu türü Enum'a çeviriyoruz
+                if (Enum.TryParse<BitkiTuru>(tespitEdilenTur, true, out var tur))
+                {
+                    // 1. Bitkiyi AI'nın bulduğu türe göre oluştur
+                    var yeniBitki = BitkiVarsayilanlari.OlusturVarsayilan(tur, $"Benim {tur} Ağacım", 0);
+
+                    // 2. Hastalığı modele işlet
+                    yeniBitki.AIAnaliziniUygula(sonuc);
+
+                    yeniBitki.FotografBase64 = onizlemeSrc;
+
+                    // 3. BAHÇEYE OTOMATİK EKLE!
+                    BahceHafizasi.BitkiEkle(yeniBitki);
+
+                    sonucBasarili = (yeniBitki.Durum == "Sağlıklı");
+                    sonucBaslik = "✨ Bitki Bahçene Eklendi!";
+                    sonucAciklama = $"Yapay Zeka bu bitkinin '{tur}' olduğunu anladı. Teşhis: {yeniBitki.Hastalik}. Bahçem sekmesinden takip edebilirsin.";
+                    sonucGoster = true;
+                }
+                else
+                {
+                    hataMesaji = $"AI türü algıladı ancak sistemde karşılığı yok: {tespitEdilenTur}";
+                }
+            }
+            else
+            {
+                hataMesaji = "AI Sunucu Hatası: " + sonuc;
+            }
+        }
+        catch (Exception ex)
+        {
+            hataMesaji = "Bağlantı Hatası: FastAPI sunucusu açık mı? " + ex.Message;
+        }
+        finally { analizYapiliyor = false; }
+    }
+    private void Sifirla()
+    {
+        fotografYuklendi = false;
+        sonucGoster = false;
+        hataMesaji = "";
+        dosyaIcerigi = null;
+        analizYapiliyor = false;
+    }
+}

@@ -1,0 +1,67 @@
+﻿@inject NavigationManager Navigation
+@implements IDisposable
+
+<div class="sidebar">
+
+    <div class="sidebar-logo">
+        <span class="sidebar-logo-icon">🌿</span>
+        <div>
+            <div class="sidebar-logo-text">Bahçem</div>
+            <div class="sidebar-logo-alt">Akıllı Bitki Takip</div>
+        </div>
+    </div>
+
+    <span class="nav-baslik">Ana Menü</span>
+
+    <a class="nav-link @AktifMi("/")" href="/">
+        <span class="nav-link-icon">🌱</span>
+        Bahçem
+    </a>
+
+
+    <a class="nav-link @AktifMi("/ai-analiz")" href="/ai-analiz">
+        <span class="nav-link-icon">🔬</span>
+        AI Analiz
+    </a>
+
+    <span class="nav-baslik" style="margin-top: 8px;">Raporlar</span>
+
+    <a class="nav-link @AktifMi("/istatistikler")" href="/istatistikler">
+        <span class="nav-link-icon">📊</span>
+        İstatistikler
+    </a>
+
+</div>
+
+@code {
+    private string mevcutUrl = "";
+
+    // Sayfa ilk yüklendiğinde çalışır
+    protected override void OnInitialized()
+    {
+        mevcutUrl = Navigation.Uri;
+        Navigation.LocationChanged += SayfaDegisti;
+    }
+
+    // Kullanıcı farklı sayfaya geçince menüyü günceller
+    private void SayfaDegisti(object? sender, LocationChangedEventArgs e)
+    {
+        mevcutUrl = e.Location;
+        StateHasChanged();
+    }
+
+    // Verilen yol mevcut sayfayla eşleşiyorsa "active" döndürür
+    private string AktifMi(string yol)
+    {
+        if (yol == "/")
+            return mevcutUrl.EndsWith("/") || mevcutUrl.EndsWith("bahcem") ? "active" : "";
+
+        return mevcutUrl.Contains(yol) ? "active" : "";
+    }
+
+    // Sayfa kapanınca event'i temizle, bellek sızıntısı olmasın
+    public void Dispose()
+    {
+        Navigation.LocationChanged -= SayfaDegisti;
+    }
+}

@@ -1,0 +1,129 @@
+﻿@page "/"
+@using BahceYonetim.Models
+@inject BahceServisi BahceHafizasi
+@implements IDisposable
+
+<div class="sayfa-baslik">
+    <h1>🌿 Bahçem</h1>
+    <p>AI ile algılanan bitkilerinin canlı simülasyonu ve acil durum yönetimi.</p>
+</div>
+
+@if (bitkiler.Count == 0)
+{
+    <div style="text-align: center; padding: 50px; background: white; border-radius: 12px; border: 2px dashed #ccc;">
+        <span style="font-size: 50px;">🌱</span>
+        <h3 style="color: #666; margin-top: 15px;">Bahçen Şu An Boş</h3>
+        <p style="color: #999;">Hemen "AI Analiz" sekmesine gidip bir yaprak fotoğrafı yükle. Sistem bitkiyi otomatik tanıyıp buraya ekleyecek!</p>
+        <a href="/ai-analiz" class="btn btn-primary" style="margin-top: 10px;">🔬 Yapay Zeka İle Analiz Et</a>
+    </div>
+}
+else
+{
+    <div class="kartlar-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px;">
+        @foreach (var bitki in bitkiler)
+        {
+            // UYARI DURUMLARINI BELİRLİYORUZ
+            bool nemKritik = bitki.NemOrani < 60; // Nem %30'un altındaysa
+            bool sicaklikKritik = bitki.Sicaklik < 20 || bitki.Sicaklik > 25; // Aşırı soğuk veya aşırı sıcaksa
+
+            // Kartın yanındaki renk çizgisi (Hastalık veya kritik ortam varsa Kırmızı olur)
+            bool bitkiRiskte = nemKritik || sicaklikKritik || bitki.Durum != "Sağlıklı";
+
+            <div class="bitki-karti" style="background: white; border-radius: 12px; padding: 20px; border-left: 5px solid @(bitkiRiskte ? "#dc3545" : "#28a745"); box-shadow: 0 2px 8px rgba(0,0,0,0.05); transition: 0.3s;">
+                <div style="margin-bottom: 15px; height: 140px; border-radius: 8px; overflow: hidden; border: 1px solid #eee; background: #f8f9fa;">
+                    @if (!string.IsNullOrEmpty(bitki.FotografBase64))
+                    {
+                        <!-- Yüklenen fotoğraf varsa tam kutuya sığdırıp gösteriyoruz (object-fit: cover) -->
+                        <img src="@bitki.FotografBase64" style="width: 100%; height: 100%; object-fit: cover;" />
+                    }
+                    else
+                    {
+                        <!-- Herhangi bir sebepten fotoğraf yoksa eski emoji gelsin -->
+                        <div style="font-size: 50px; text-align: center; line-height: 140px;">@bitki.Ikon</div>
+                    }
+                </div>
+                <h4 style="margin:0;">@bitki.Ad</h4>
+
+                <div style="margin-top: 15px;">
+                    <!-- NEM DURUMU -->
+                    <div style="display: flex; justify-content: space-between; font-size: 13px; color: @(nemKritik ? "#dc3545" : "inherit"); font-weight: @(nemKritik ? "bold" : "normal");">
+                        <span>💧 Nem @(nemKritik ? "⚠️ (Sula!)" : "")</span>
+                        <span>%@((int)bitki.NemOrani)</span>
+                    </div>
+                    <div class="progress" style="height: 6px; margin-bottom: 10px;">
+                        <div class="progress-bar @(nemKritik ? "bg-danger" : "bg-info")" style="width: @bitki.NemOrani%"></div>
+                    </div>
+
+                    <!-- SICAKLIK DURUMU -->
+                    <div style="display: flex; justify-content: space-between; font-size: 13px; color: @(sicaklikKritik ? "#dc3545" : "inherit"); font-weight: @(sicaklikKritik ? "bold" : "normal");">
+                        <span>🌡️ Sıcaklık @(sicaklikKritik ? "⚠️ (Ayarla!)" : "")</span>
+                        <span>@bitki.Sicaklik °C</span>
+                    </div>
+                </div>
+
+                <div style="font-size: 12px; background: #f8f9fa; padding: 8px; border-radius: 6px; margin-top: 15px; color: #1114;">
+                    <b>AI Teşhis:</b> <span style="color: @(bitki.Durum == "Sağlıklı" ? "#28a745" : "#dc3545");">@bitki.Hastalik</span>
+                </div>
+
+                <!-- MÜDAHALE BUTONLARI -->
+                <div style="margin-top: 15px; display: flex; gap: 10px;">
+                    <button class="btn btn-sm btn-outline-info" style="flex: 1;" @onclick="() => Sula(bitki)">
+                        💧 Sula
+                    </button>
+                    <button class="btn btn-sm btn-outline-warning" style="flex: 1;" @onclick="() => SicakligiAyarla(bitki)">
+                        🌡️ İklimlendir
+                    </button>
+                </div>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    private List<Bitki> bitkiler = new();
+    private Timer? timer;
+
+    protected override void OnInitialized()
+    {
+        bitkiler = BahceHafizasi.Bitkiler;
+
+        // CANLI SİMÜLASYON
+        var rnd = new Random();
+        timer = new Timer(_ =>
+        {
+            foreach (var b in bitkiler)
+            {
+                // Nem her 2 saniyede bir düşer (Uyarıyı görebilmen için biraz hızlı düşürdük)
+                b.NemOrani -= rnd.NextDouble() * 3.0;
+                if (b.NemOrani < 0) b.NemOrani = 0;
+
+                // Sıcaklık dalgalanır
+                double sicaklikFarki = (rnd.NextDouble() * 4) - 2; // -2 ile +2 arası
+                b.Sicaklik += sicaklikFarki;
+
+                // Min/Max sıcaklık sınırları
+                if (b.Sicaklik < 5) b.Sicaklik = 5;
+                if (b.Sicaklik > 45) b.Sicaklik = 45;
+
+                b.Sicaklik = Math.Round(b.Sicaklik, 1);
+            }
+            // Ekranı güncelle
+            InvokeAsync(StateHasChanged);
+        }, null, 2000, 2000);
+    }
+
+    // BUTON AKSİYONLARI (KULLANICI MÜDAHALESİ)
+    private void Sula(Bitki bitki)
+    {
+        // Sulama yapıldığında nem %95'e sabitlenir ve uyarı ortadan kalkar
+        bitki.NemOrani = 95.0;
+    }
+
+    private void SicakligiAyarla(Bitki bitki)
+    {
+        // İklimlendirme yapıldığında sıcaklık ideal değer olan 24°C'ye döner
+        bitki.Sicaklik = 24.0;
+    }
+
+    public void Dispose() => timer?.Dispose();
+}

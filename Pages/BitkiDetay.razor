@@ -1,0 +1,44 @@
+﻿@page "/bitki-detay/{Id:int}"
+@using BahceYonetim.Models
+@inject NavigationManager Navigation
+
+@if (bitki != null)
+{
+    <a class="geri-btn" href="/">← Geri Dön</a>
+
+    <div class="detay-ust">
+        <span class="detay-ikon">@bitki.Ikon</span>
+        <div class="detay-bilgi">
+            <h2>@bitki.Ad</h2>
+            <p>@bitki.Tur · <span class="@bitki.DurumClass">@bitki.Durum</span></p>
+        </div>
+    </div>
+
+    <div class="detay-grid">
+        <div class="detay-kart">
+            <div class="detay-kart-baslik">🔬 AI Analizi</div>
+            <div class="detay-kart-deger" style="font-size: 18px; color: var(--yazi);">@bitki.Hastalik</div>
+        </div>
+        <div class="detay-kart">
+            <div class="detay-kart-baslik">💧 Nem</div>
+            <div class="detay-kart-deger">%@((int)bitki.NemOrani)</div>
+        </div>
+    </div>
+
+    <div class="not-alani">
+        <div class="detay-kart-baslik">📝 Notlar</div>
+        <textarea @bind="bitki.Not" placeholder="Notlarını buraya yaz..."></textarea>
+        <button class="btn btn-primary" style="width: auto; margin-top: 10px;" @onclick="() => { }">💾 Kaydet</button>
+    </div>
+}
+
+@code {
+    [Parameter] public int Id { get; set; }
+    private Bitki? bitki;
+
+    protected override void OnInitialized()
+    {
+        // Örnek bulma mantığı
+        bitki = BitkiVarsayilanlari.OlusturVarsayilan(BitkiTuru.Elma, "Örnek Elma", Id);
+    }
+}

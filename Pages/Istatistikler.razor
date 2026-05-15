@@ -1,0 +1,130 @@
+﻿@page "/istatistikler"
+@using BahceYonetim.Models
+@inject BahceServisi BahceHafizasi
+@implements IDisposable
+
+<div class="sayfa-baslik">
+    <h1>📊 İstatistikler</h1>
+    <p>Bahçenin genel sağlık raporu, AI analiz sonuçları ve anlık durum takibi.</p>
+</div>
+
+@if (bitkiler.Count == 0)
+{
+    <div style="text-align: center; padding: 50px; background: white; border-radius: 12px; border: 2px dashed #ccc;">
+        <span style="font-size: 50px;">📉</span>
+        <h3 style="color: #666; margin-top: 15px;">Henüz Veri Yok</h3>
+        <p style="color: #999;">İstatistikleri görmek için önce "AI Analiz" sayfasından bahçene bitki eklemelisin.</p>
+        <a href="/ai-analiz" class="btn btn-primary" style="margin-top: 10px;">🔬 Yapay Zeka İle Analiz Et</a>
+    </div>
+}
+else
+{
+    <div class="stat-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 30px;">
+        <div class="stat-kart" style="background: white; padding: 20px; border-radius: 12px; border-left: 5px solid #6c757d; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
+            <div class="stat-sayi" style="font-size: 32px; font-weight: bold; color: #6c757d;">@bitkiler.Count</div>
+            <div class="stat-label" style="color: #666; font-size: 14px;">Toplam Bitki</div>
+        </div>
+        <div class="stat-kart" style="background: white; padding: 20px; border-radius: 12px; border-left: 5px solid #28a745; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
+            <div class="stat-sayi" style="font-size: 32px; font-weight: bold; color: #28a745;">@SaglikliSayisi</div>
+            <div class="stat-label" style="color: #666; font-size: 14px;">İdeal / Sağlıklı</div>
+        </div>
+        <div class="stat-kart" style="background: white; padding: 20px; border-radius: 12px; border-left: 5px solid #dc3545; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
+            <div class="stat-sayi" style="font-size: 32px; font-weight: bold; color: #dc3545;">@KritikSayisi</div>
+            <div class="stat-label" style="color: #666; font-size: 14px;">Riskli / Hasta</div>
+        </div>
+        <div class="stat-kart" style="background: white; padding: 20px; border-radius: 12px; border-left: 5px solid #0dcaf0; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
+            <div class="stat-sayi" style="font-size: 32px; font-weight: bold; color: #0dcaf0;">@OrtalamaNem%</div>
+            <div class="stat-label" style="color: #666; font-size: 14px;">Ortalama Nem</div>
+        </div>
+    </div>
+
+    <div style="background: white; border-radius: 12px; padding: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
+        <div style="font-size: 18px; font-weight: 700; margin-bottom: 20px; border-bottom: 1px solid #eee; padding-bottom: 10px;">📋 Detaylı Bitki Raporu</div>
+
+        @foreach (var bitki in bitkiler)
+        {
+            // Yeni mantıkla bitkinin gerçekten sağlıklı olup olmadığını kontrol ediyoruz
+            bool saglikliMi = BitkiSaglikliMi(bitki);
+            bool nemKritik = bitki.NemOrani < 30;
+            bool sicaklikKritik = bitki.Sicaklik < 15 || bitki.Sicaklik > 35;
+
+            // Eğer nem kötüyse, sıcaklık kötüyse VEYA bitki sağlıklı DEĞİLSE risklidir
+            bool riskli = nemKritik || sicaklikKritik || !saglikliMi;
+
+            <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 15px; padding: 15px; background: @(riskli ? "#fff5f5" : "#f8fff9"); border-radius: 8px; border: 1px solid @(riskli ? "#ffcdd2" : "#c8e6c9"); transition: 0.3s;">
+                <div style="width: 60px; height: 60px; flex-shrink: 0; border-radius: 8px; overflow: hidden; background: #f8f9fa; display: flex; align-items: center; justify-content: center; border: 1px solid #ddd;">
+                    @if (!string.IsNullOrEmpty(bitki.FotografBase64))
+                    {
+                        <img src="@bitki.FotografBase64" style="width: 100%; height: 100%; object-fit: cover;" />
+                    }
+                    else
+                    {
+                        <span style="font-size: 30px;">@bitki.Ikon</span>
+                    }
+                </div>
+
+                <div style="width: 150px; flex-shrink: 0;">
+                    <div style="font-size: 15px; font-weight: 600;">@bitki.Ad</div>
+                    <div style="font-size: 12px; color: @(saglikliMi ? "#28a745" : "#dc3545"); font-weight: 500;">Teşhis: @bitki.Hastalik</div>
+                </div>
+
+                <!-- Nem Çubuğu -->
+                <div style="flex: 1; min-width: 100px;">
+                    <div style="font-size: 11px; margin-bottom: 3px; color: #666; font-weight: @(nemKritik ? "bold" : "normal");">
+                        💧 Nem: %@((int)bitki.NemOrani)
+                    </div>
+                    <div class="progress" style="height: 8px; border-radius: 4px; background-color: #e9ecef;">
+                        <div class="progress-bar @(nemKritik ? "bg-danger" : "bg-info")" style="width: @bitki.NemOrani%; border-radius: 4px;"></div>
+                    </div>
+                </div>
+
+                <!-- Sıcaklık -->
+                <div style="width: 100px; text-align: center;">
+                    <div style="font-size: 11px; color: #666;">🌡️ Sıcaklık</div>
+                    <div style="font-size: 14px; font-weight: bold; color: @(sicaklikKritik ? "#dc3545" : "#333");">@bitki.Sicaklik °C</div>
+                </div>
+
+                <!-- Genel Durum Rozeti -->
+                <div style="width: 110px; text-align: right;">
+                    @if (riskli)
+                    {
+                        <span style="background: #dc3545; color: white; padding: 5px 10px; border-radius: 20px; font-size: 12px; font-weight: bold;">Müdahale Gerek</span>
+                    }
+                    else
+                    {
+                        <span style="background: #28a745; color: white; padding: 5px 10px; border-radius: 20px; font-size: 12px; font-weight: bold;">İdeal Durum</span>
+                    }
+                </div>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    private List<Bitki> bitkiler = new();
+    private Timer? timer;
+
+    // AI'dan gelen "Saglikli", "Sağlıklı", "SAGLIKLI" gibi farklı formatları tolere eden metot
+    private bool BitkiSaglikliMi(Bitki b)
+    {
+        string durum = b.Durum?.ToLower() ?? "";
+        string hastalik = b.Hastalik?.ToLower() ?? "";
+
+        return durum.Contains("sağlıklı") || durum.Contains("saglikli") ||
+               hastalik.Contains("sağlıklı") || hastalik.Contains("saglikli");
+    }
+
+    private int SaglikliSayisi => bitkiler.Count(b => BitkiSaglikliMi(b) && b.NemOrani >= 30 && b.Sicaklik >= 15 && b.Sicaklik <= 35);
+
+    private int KritikSayisi => bitkiler.Count(b => !BitkiSaglikliMi(b) || b.NemOrani < 30 || b.Sicaklik < 15 || b.Sicaklik > 35);
+
+    private int OrtalamaNem => bitkiler.Any() ? (int)bitkiler.Average(b => b.NemOrani) : 0;
+
+    protected override void OnInitialized()
+    {
+        bitkiler = BahceHafizasi.Bitkiler;
+        timer = new Timer(_ => InvokeAsync(StateHasChanged), null, 1000, 1000);
+    }
+
+    public void Dispose() => timer?.Dispose();
+}
